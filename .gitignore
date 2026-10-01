@@ -141,3 +141,16 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Python / Backend
+__pycache__/
+*.py[cod]
+*.class
+*.db
+backend/docmind.db
+backend/uploads/*.pdf
+!backend/uploads/.gitkeep
+backend/.env
+.venv/
+env/
+venv/

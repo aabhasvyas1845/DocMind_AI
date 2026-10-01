@@ -1,16 +1,24 @@
-import React from "react";
-import { useState } from "react";
+﻿import React, { useState } from "react";
 import { ChevronLeft, ChevronRight, Maximize2, Minus, Plus } from "lucide-react";
+import { API_BASE_URL } from "./api";
 
-function PDFViewer({ document }) {
-  const [page, setPage] = useState(42);
+function PDFViewer({ document, currentPage, onPageChange }) {
   const [zoom, setZoom] = useState(100);
 
-  const totalPages = 128;
+  const totalPages = document?.total_pages || 128;
+  const activePage = currentPage || 1;
 
   function changePage(amount) {
-    setPage((current) => Math.min(totalPages, Math.max(1, current + amount)));
+    const newPage = Math.min(totalPages, Math.max(1, activePage + amount));
+    if (onPageChange) {
+      onPageChange(newPage);
+    }
   }
+
+  // Generate full URL if it's served from the backend
+  const pdfSource = document?.file_url 
+    ? (document.file_url.startsWith("http") ? document.file_url : `http://127.0.0.1:8000${document.file_url}`)
+    : document?.fileUrl;
 
   return (
     <section className="pdf-viewer">
@@ -24,24 +32,26 @@ function PDFViewer({ document }) {
           <button onClick={() => setZoom((z) => Math.max(70, z - 10))}><Minus size={14} /></button>
           <span>{zoom}%</span>
           <button onClick={() => setZoom((z) => Math.min(140, z + 10))}><Plus size={14} /></button>
-          <button><Maximize2 size={14} /></button>
+          <button onClick={() => window.open(pdfSource, "_blank")} title="Open PDF in new tab"><Maximize2 size={14} /></button>
         </div>
       </div>
 
       <div className="pdf-canvas">
-        {document?.fileUrl ? (
+        {pdfSource ? (
           <iframe
+            key={`${document?.id}-${activePage}`}
             title="Uploaded PDF"
-            src={`${document.fileUrl}#page=${page}`}
+            src={`${pdfSource}#page=${activePage}&zoom=${zoom}`}
+            style={{ width: "100%", height: "100%", border: "none", borderRadius: "8px" }}
           />
         ) : (
           <div className="fake-pdf">
             <div className="pdf-meta">
-              <span>JAVA PROGRAMMING</span>
-              <span>PAGE {page}</span>
+              <span>{document?.name || "ACADEMIC DOCUMENT"}</span>
+              <span>PAGE {activePage}</span>
             </div>
 
-            <h2>POLYMORPHISM</h2>
+            <h2>DOCUMENT PREVIEW</h2>
 
             <div className="pdf-rule-lines">
               <span />
@@ -50,28 +60,17 @@ function PDFViewer({ document }) {
             </div>
 
             <p>
-              Polymorphism is the ability of an object or method to take
-              different forms. It allows a common interface to work with
-              different implementations.
+              Please upload or select an academic PDF document to view and study with DocMind AI.
             </p>
 
-            <h4>5.1 RUNTIME POLYMORPHISM</h4>
-
-            <div className="pdf-rule-lines">
-              <span />
-              <span />
-              <span />
-              <span className="medium" />
-            </div>
-
-            <div className="fake-page-number">{page}</div>
+            <div className="fake-page-number">{activePage}</div>
           </div>
         )}
       </div>
 
       <div className="viewer-footer">
         <button onClick={() => changePage(-1)}><ChevronLeft size={15} /></button>
-        <span>Page {page} of {totalPages}</span>
+        <span>Page {activePage} of {totalPages}</span>
         <button onClick={() => changePage(1)}><ChevronRight size={15} /></button>
       </div>
     </section>
