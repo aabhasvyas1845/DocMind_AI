@@ -1,9 +1,12 @@
-﻿import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   BookOpen,
   Bot,
+  CheckCircle,
+  FileCheck,
   FileText,
   GraduationCap,
+  Loader2,
   MessageCircle,
   MoreHorizontal,
   Paperclip,
@@ -12,7 +15,6 @@ import {
   Sparkles,
   UploadCloud,
   X,
-  FileCheck,
   Eye,
   EyeOff
 } from "lucide-react";
@@ -23,28 +25,77 @@ import Upload from "./Upload";
 import PDFViewer from "./PDFViewer";
 import AIChat from "./AIChat";
 import StudyTools from "./StudyTools";
-import { uploadDocumentApi, fetchDocumentsApi } from "./api";
+import SettingsModal from "./SettingsModal";
+import { uploadDocumentApi, fetchDocumentsApi, sendChatMessageApi } from "./api";
 
 function App() {
   const fileInput = useRef(null);
+  
+  // Theme state: dark / light
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem("docmind_theme") || "dark";
+  });
+
+  // Settings modal state
+  const [showSettings, setShowSettings] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("gemini-3.5-flash-lite");
+
+  // Document & Workspace states
   const [documents, setDocuments] = useState([]);
   const [activeDocument, setActiveDocument] = useState(null);
   const [view, setView] = useState("home"); // "home" or "document"
   const [tool, setTool] = useState(null);
   const [chatOpen, setChatOpen] = useState(true);
-  const [toast, setToast] = useState("");
   const [activePage, setActivePage] = useState(1);
-  const [homeQuestion, setHomeQuestion] = useState("");
-  const [initialChatMessage, setInitialChatMessage] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [showPdfViewer, setShowPdfViewer] = useState(false); // Default to clean full-screen chat!
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [toast, setToast] = useState("");
 
+  // Prompt & Chat states
+  const [homeQuestion, setHomeQuestion] = useState("");
+  const [activeChatId, setActiveChatId] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [thinking, setThinking] = useState(false);
+
+  // Upload Progress state
+  const [uploading, setUploading] = useState(false);
+  const [uploadInfo, setUploadInfo] = useState(null);
+
+  // Conversations / Recent Chats list (stored in localStorage)
+  const [chats, setChats] = useState(() => {
+    try {
+      const saved = localStorage.getItem("docmind_chats");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Apply theme attribute to document element
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("docmind_theme", theme);
+  }, [theme]);
+
+  // Persist chats to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("docmind_chats", JSON.stringify(chats));
+    } catch (err) {
+      console.warn("Failed to persist chats:", err);
+    }
+  }, [chats]);
+
+  // Load existing backend documents on initial mount
   useEffect(() => {
     async function loadDocs() {
       try {
         const backendDocs = await fetchDocumentsApi();
         if (backendDocs && backendDocs.length > 0) {
           setDocuments(backendDocs);
+          // If no active doc and user hasn't chosen one, set the first one as default
+          if (!activeDocument) {
+            setActiveDocument(backendDocs[0]);
+          }
         }
       } catch (err) {
         console.log("Documents init:", err.message);
@@ -53,20 +104,17 @@ function App() {
     loadDocs();
   }, []);
 
+  function toggleTheme() {
+    setTheme((curr) => (curr === "dark" ? "light" : "dark"));
+  }
+
   function showToast(message) {
     setToast(message);
     window.clearTimeout(window.docMindToast);
-    window.docMindToast = window.setTimeout(() => setToast(""), 3000);
+    window.docMindToast = window.setTimeout(() => setToast(""), 3200);
   }
 
-  function openDocument(document) {
-    setActiveDocument(document);
-    setActivePage(1);
-    setView("document");
-    setChatOpen(true);
-    setTool(null);
-  }
-
+  // Handle PDF Upload with detailed progress status modal
   async function handleFile(file) {
     if (!file) return;
 
@@ -75,30 +123,228 @@ function App() {
       return;
     }
 
+    const fileSizeStr = `${Math.max(1, Math.round(file.size / 1024 / 1024))} MB`;
+    setUploadInfo({
+      filename: file.name,
+      size: fileSizeStr,
+      step: 1,
+      statusText: "Uploading file to DocMind backend..."
+    });
     setUploading(true);
-    showToast(`Uploading and extracting "${file.name}"...`);
+
+    // Simulate progressive status updates for user feedback
+    const stepTimer1 = setTimeout(() => {
+      setUploadInfo((curr) => curr ? {
+        ...curr,
+        step: 2,
+        statusText: "Extracting pages & text chunks with PyMuPDF..."
+      } : null);
+    }, 900);
+
+    const stepTimer2 = setTimeout(() => {
+      setUploadInfo((curr) => curr ? {
+        ...curr,
+        step: 3,
+        statusText: "Indexing document chunks into SQLite database..."
+      } : null);
+    }, 2000);
 
     try {
       const uploadedDoc = await uploadDocumentApi(file);
-      setDocuments((current) => [uploadedDoc, ...current]);
-      setActiveDocument(uploadedDoc);
-      setActivePage(1);
-      showToast(`"${file.name}" ready! (${uploadedDoc.total_pages} pages indexed)`);
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
+
+      // Finish progress
+      setUploadInfo((curr) => curr ? {
+        ...curr,
+        step: 4,
+        statusText: "Complete! Ready to chat."
+      } : null);
+
+      setTimeout(() => {
+        setDocuments((current) => [uploadedDoc, ...current]);
+        setActiveDocument(uploadedDoc);
+        setActivePage(1);
+        setUploading(false);
+        setUploadInfo(null);
+        showToast(`"${file.name}" ready to chat!`);
+      }, 500);
+
     } catch (err) {
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
       console.error("Upload error:", err);
+
       const localDoc = {
         id: Date.now(),
         name: file.name,
-        meta: `${Math.max(1, Math.ceil(file.size / 1000000))} MB · local preview`,
+        meta: `${fileSizeStr} · local preview`,
         fileUrl: URL.createObjectURL(file),
         total_pages: 1
       };
       setDocuments((current) => [localDoc, ...current]);
       setActiveDocument(localDoc);
       setActivePage(1);
-      showToast(`Document loaded.`);
-    } finally {
       setUploading(false);
+      setUploadInfo(null);
+      showToast(`Document loaded in offline mode.`);
+    }
+  }
+
+  // Start a fresh new chat session
+  function handleNewChat() {
+    setActiveChatId(null);
+    setChatMessages([
+      {
+        role: "ai",
+        text: activeDocument
+          ? `I have indexed "${activeDocument.name}". Ask me any questions, request explanations, or test your understanding. I will cite the exact page numbers from your document!`
+          : "Attach a PDF document to start asking questions with verified source page citations."
+      }
+    ]);
+    setView("home");
+    setHomeQuestion("");
+    setTool(null);
+  }
+
+  // Switch to a selected previous conversation
+  function handleSelectChat(chat) {
+    setActiveChatId(chat.id);
+    if (chat.document) {
+      setActiveDocument(chat.document);
+    } else if (chat.documentId) {
+      const matched = documents.find((d) => d.id === chat.documentId);
+      if (matched) setActiveDocument(matched);
+    }
+    setChatMessages(chat.messages || []);
+    setView("document");
+    setChatOpen(true);
+    setTool(null);
+  }
+
+  // Delete a specific chat
+  function handleDeleteChat(chatId) {
+    setChats((current) => current.filter((c) => c.id !== chatId));
+    if (activeChatId === chatId) {
+      handleNewChat();
+    }
+    showToast("Conversation deleted.");
+  }
+
+  // Clear all chats from settings
+  function handleClearAllChats() {
+    setChats([]);
+    handleNewChat();
+    showToast("All conversation history cleared.");
+  }
+
+  // Open an uploaded document directly
+  function openDocument(doc) {
+    setActiveDocument(doc);
+    setActivePage(1);
+    
+    // Check if an existing chat exists for this document
+    const existing = chats.find((c) => c.documentId === doc.id || c.document?.id === doc.id);
+    if (existing) {
+      handleSelectChat(existing);
+    } else {
+      setActiveChatId(null);
+      setChatMessages([
+        {
+          role: "ai",
+          text: `I have indexed "${doc.name}". Ask me any questions, request explanations, or test your understanding. I will cite the exact page numbers from your document!`
+        }
+      ]);
+      setView("document");
+      setChatOpen(true);
+      setTool(null);
+    }
+  }
+
+  // Send a chat message (from either Home or AIChat)
+  async function handleSendMessage(query) {
+    const text = query.trim();
+    if (!text || thinking) return;
+
+    if (!activeDocument) {
+      showToast("Please attach a PDF document first.");
+      fileInput.current?.click();
+      return;
+    }
+
+    // Switch view to document workspace immediately
+    if (view !== "document") {
+      setView("document");
+      setChatOpen(true);
+      setTool(null);
+    }
+
+    const userMsg = { role: "user", text };
+    const updatedMessages = [...chatMessages, userMsg];
+    setChatMessages(updatedMessages);
+    setThinking(true);
+
+    try {
+      let aiResponseText = "";
+      let aiSourcePage = null;
+
+      if (typeof activeDocument.id === "number") {
+        const response = await sendChatMessageApi(activeDocument.id, text);
+        aiResponseText = response.text;
+        aiSourcePage = response.source;
+      } else {
+        aiResponseText = "Please attach an indexed PDF document to get precise, cited answers.";
+        aiSourcePage = 1;
+      }
+
+      const aiMsg = {
+        role: "ai",
+        text: aiResponseText,
+        source: aiSourcePage
+      };
+
+      const finalMessages = [...updatedMessages, aiMsg];
+      setChatMessages(finalMessages);
+
+      // Save or update in recent chats list (Antigravity-style)
+      const currentChatId = activeChatId || `chat_${Date.now()}`;
+      setActiveChatId(currentChatId);
+
+      setChats((prevChats) => {
+        const existingIdx = prevChats.findIndex((c) => c.id === currentChatId);
+        const chatSnippet = text.length > 55 ? text.slice(0, 52) + "..." : text;
+        const chatTitle = activeDocument.name.replace(/\.[^/.]+$/, "");
+
+        const chatEntry = {
+          id: currentChatId,
+          title: chatTitle,
+          preview: chatSnippet,
+          time: "Just now",
+          timestamp: Date.now(),
+          documentId: activeDocument.id,
+          document: activeDocument,
+          messages: finalMessages
+        };
+
+        if (existingIdx >= 0) {
+          const updated = [...prevChats];
+          updated[existingIdx] = chatEntry;
+          return updated;
+        } else {
+          return [chatEntry, ...prevChats];
+        }
+      });
+
+    } catch (err) {
+      setChatMessages((curr) => [
+        ...curr,
+        {
+          role: "ai",
+          text: `Error: ${err.message}. Make sure your backend server is running.`
+        }
+      ]);
+    } finally {
+      setThinking(false);
     }
   }
 
@@ -106,32 +352,13 @@ function App() {
     if (e) e.preventDefault();
     const query = homeQuestion.trim();
     if (!query) return;
-
-    if (!activeDocument) {
-      showToast("Please attach a PDF first so DocMind can answer your question.");
-      fileInput.current?.click();
-      return;
-    }
-
-    setInitialChatMessage(query);
     setHomeQuestion("");
-    setView("document");
-    setChatOpen(true);
-    setTool(null);
-  }
-
-  function newChat() {
-    setActiveDocument(null);
-    setView("home");
-    setTool(null);
-    setChatOpen(false);
-    setHomeQuestion("");
-    setInitialChatMessage("");
+    handleSendMessage(query);
   }
 
   function openTool(toolName) {
     if (!activeDocument) {
-      showToast("Please upload a PDF first to use " + toolName + ".");
+      showToast("Please attach a PDF first to use " + toolName + ".");
       fileInput.current?.click();
       return;
     }
@@ -141,21 +368,21 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={theme}>
       <Sidebar
-        documents={documents}
-        activeDocument={activeDocument}
-        view={view}
-        onNewChat={newChat}
-        onOpenDocument={openDocument}
-        onOpenTool={openTool}
+        chats={chats}
+        activeChatId={activeChatId}
+        onNewChat={handleNewChat}
+        onSelectChat={handleSelectChat}
+        onDeleteChat={handleDeleteChat}
+        onOpenSettings={() => setShowSettings(true)}
       />
 
       <div className="content">
         <Navbar
-          onNewChat={newChat}
-          onSettings={() => showToast("DocMind AI & Gemini 3.6 Flash connected.")}
-          onTheme={() => showToast("Dark theme is active.")}
+          currentTheme={theme}
+          onTheme={toggleTheme}
+          onSettings={() => setShowSettings(true)}
         />
 
         {view === "home" && (
@@ -169,11 +396,13 @@ function App() {
             homeQuestion={homeQuestion}
             setHomeQuestion={setHomeQuestion}
             onSubmitQuestion={handleHomeSubmit}
-            onOpenTool={openTool}
             onOpenDocument={openDocument}
             documents={documents}
             onGoToDocument={() => {
-              if (activeDocument) setView("document");
+              if (activeDocument) {
+                setView("document");
+                setChatOpen(true);
+              }
             }}
           />
         )}
@@ -186,8 +415,9 @@ function App() {
             activePage={activePage}
             showPdfViewer={showPdfViewer}
             onTogglePdf={() => setShowPdfViewer(!showPdfViewer)}
-            initialQuestion={initialChatMessage}
-            onClearInitialQuestion={() => setInitialChatMessage("")}
+            messages={chatMessages}
+            thinking={thinking}
+            onSendMessage={handleSendMessage}
             onPageChange={setActivePage}
             onChat={() => {
               setChatOpen(true);
@@ -215,6 +445,69 @@ function App() {
         />
       </div>
 
+      {/* Upload Progress Modal / Overlay */}
+      {uploading && uploadInfo && (
+        <div className="modal-backdrop">
+          <div className="upload-progress-card" style={{ position: "relative" }}>
+            <button 
+              className="modal-close" 
+              style={{ position: "absolute", top: "14px", right: "14px" }}
+              onClick={() => {
+                setUploading(false);
+                setUploadInfo(null);
+              }}
+              title="Close"
+            >
+              <X size={16} />
+            </button>
+            <div className="upload-progress-icon">
+              <UploadCloud size={30} className="pulse-icon" />
+            </div>
+
+            <h3>Uploading & Indexing Document</h3>
+            <p className="upload-filename">
+              <strong>{uploadInfo.filename}</strong> ({uploadInfo.size})
+            </p>
+
+            {/* Stepper indicator */}
+            <div className="upload-stepper">
+              <div className={`step-item ${uploadInfo.step >= 1 ? "done" : "active"}`}>
+                <div className="step-circle">{uploadInfo.step > 1 ? "✓" : "1"}</div>
+                <span>Upload</span>
+              </div>
+              <div className="step-line" />
+              <div className={`step-item ${uploadInfo.step >= 2 ? (uploadInfo.step > 2 ? "done" : "active") : ""}`}>
+                <div className="step-circle">{uploadInfo.step > 2 ? "✓" : "2"}</div>
+                <span>PyMuPDF Extract</span>
+              </div>
+              <div className="step-line" />
+              <div className={`step-item ${uploadInfo.step >= 3 ? (uploadInfo.step > 3 ? "done" : "active") : ""}`}>
+                <div className="step-circle">{uploadInfo.step > 3 ? "✓" : "3"}</div>
+                <span>SQLite Index</span>
+              </div>
+            </div>
+
+            <div className="progress-bar-container">
+              <div className="progress-bar-fill" style={{ width: uploadInfo.step === 1 ? "35%" : uploadInfo.step === 2 ? "70%" : "100%" }} />
+            </div>
+
+            <div className="upload-status-subtext">
+              <Loader2 size={13} className="spin-icon" />
+              <span>{uploadInfo.statusText}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        currentModel={selectedModel}
+        onModelChange={setSelectedModel}
+        onClearChats={handleClearAllChats}
+      />
+
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
@@ -230,7 +523,6 @@ function Home({
   homeQuestion,
   setHomeQuestion,
   onSubmitQuestion,
-  onOpenTool,
   onOpenDocument,
   documents,
   onGoToDocument
@@ -253,47 +545,19 @@ function Home({
           exam questions, and flashcards.
         </p>
 
-        <div className="hero-actions">
-          <button className="hero-action" onClick={onUpload} disabled={uploading}>
-            <UploadCloud size={17} />
-            {uploading ? "Extracting..." : "Upload PDF"}
-          </button>
-          <button className="hero-action" onClick={() => onOpenTool("summary")}>
-            <FileText size={17} />
-            Summarize
-          </button>
-          <button className="hero-action" onClick={() => onOpenTool("exam")}>
-            <GraduationCap size={17} />
-            Generate Questions
-          </button>
-          <button className="hero-action" onClick={() => onOpenTool("flashcards")}>
-            <BookOpen size={17} />
-            Create Flashcards
-          </button>
-        </div>
+        {/* Note: The 4 buttons were removed as requested! */}
 
         <form className="home-prompt" onSubmit={onSubmitQuestion}>
           {activeDocument && (
-            <div style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px",
-              margin: "12px 20px 0",
-              background: "#1e1828",
-              border: "1px solid #7937dc",
-              padding: "6px 12px",
-              borderRadius: "20px",
-              fontSize: "11px",
-              color: "#e2d8ee"
-            }}>
-              <FileCheck size={14} color="#38d39f" />
-              <strong>{activeDocument.name}</strong>
-              <span style={{ color: "#8a8195", fontSize: "10px" }}>({activeDocument.meta})</span>
+            <div className="attached-document-badge">
+              <FileCheck size={14} color="var(--green)" />
+              <strong className="badge-name">{activeDocument.name}</strong>
+              <span className="badge-meta">({activeDocument.meta || `${activeDocument.total_pages || 1} pages`})</span>
               <button
                 type="button"
+                className="badge-remove-btn"
                 onClick={onRemoveDocument}
-                style={{ background: "transparent", border: "none", color: "#b9b0c2", display: "flex", padding: 0 }}
-                title="Remove attached document"
+                title="Detach document"
               >
                 <X size={13} />
               </button>
@@ -315,20 +579,21 @@ function Home({
                 <Paperclip size={14} /> {activeDocument ? "Change PDF" : "Attach PDF"}
               </button>
               {activeDocument && (
-                <button type="button" onClick={onGoToDocument} style={{ color: "#a85cff" }}>
+                <button type="button" onClick={onGoToDocument} className="open-chat-link">
                   <MessageCircle size={14} /> Open Chat →
                 </button>
               )}
-              <span className="online"><i /> Gemini 3.6 Online</span>
+              <span className="online-badge"><i /> Ready</span>
             </div>
 
-            <button className="send-circle" type="submit" disabled={uploading}>
+            <button className="send-circle" type="submit" disabled={uploading || !homeQuestion.trim()}>
               <Send size={16} />
             </button>
           </div>
         </form>
       </section>
 
+      {/* Uploaded Documents List */}
       {documents.length > 0 && (
         <section className="recent-section" style={{ marginTop: "36px" }}>
           <div className="section-title">
@@ -338,14 +603,14 @@ function Home({
           <div className="recent-grid">
             {documents.slice(0, 3).map((doc) => (
               <button
-                className="recent-card"
+                className={`recent-card ${activeDocument?.id === doc.id ? "active-doc-card" : ""}`}
                 key={doc.id}
                 onClick={() => onOpenDocument(doc)}
               >
                 <div className="recent-icon"><FileText size={16} /></div>
                 <div className="recent-copy">
                   <strong>{doc.name}</strong>
-                  <span>{doc.meta}</span>
+                  <span>{doc.meta || `${doc.total_pages || 1} pages`}</span>
                 </div>
                 <MoreHorizontal size={17} />
               </button>
@@ -366,8 +631,9 @@ function DocumentWorkspace({
   activePage,
   showPdfViewer,
   onTogglePdf,
-  initialQuestion,
-  onClearInitialQuestion,
+  messages,
+  thinking,
+  onSendMessage,
   onPageChange,
   onChat,
   onTool,
@@ -383,15 +649,35 @@ function DocumentWorkspace({
           <h1>{document?.name || "Document Chat"}</h1>
         </div>
 
-        <div style={{ display: "flex", gap: "10px" }}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          {/* Quick study tools buttons inside workspace */}
+          <button 
+            className={`tool-pill ${tool === "summary" ? "active" : ""}`} 
+            onClick={() => onTool(tool === "summary" ? null : "summary")}
+          >
+            <FileText size={14} /> Summary
+          </button>
+          <button 
+            className={`tool-pill ${tool === "exam" ? "active" : ""}`} 
+            onClick={() => onTool(tool === "exam" ? null : "exam")}
+          >
+            <GraduationCap size={14} /> Exam
+          </button>
+          <button 
+            className={`tool-pill ${tool === "flashcards" ? "active" : ""}`} 
+            onClick={() => onTool(tool === "flashcards" ? null : "flashcards")}
+          >
+            <BookOpen size={14} /> Cards
+          </button>
+
           <button 
             className="change-doc" 
             onClick={onTogglePdf}
-            style={{ color: showPdfViewer ? "#c48aff" : "#999" }}
+            style={{ color: showPdfViewer ? "var(--purple)" : "var(--muted)" }}
             title="Toggle PDF document preview"
           >
             {showPdfViewer ? <EyeOff size={15} /> : <Eye size={15} />}
-            {showPdfViewer ? "Hide PDF Split View" : "View PDF Split View"}
+            {showPdfViewer ? "Hide PDF" : "Split PDF"}
           </button>
 
           <button className="change-doc" onClick={onUpload}>
@@ -416,11 +702,12 @@ function DocumentWorkspace({
           />
         )}
 
-        {chatOpen && (
+        {chatOpen && !tool && (
           <AIChat 
             document={document} 
-            initialQuestion={initialQuestion}
-            onClearInitialQuestion={onClearInitialQuestion}
+            messages={messages}
+            thinking={thinking}
+            onSendMessage={onSendMessage}
             onClose={onClosePanel} 
             onSelectSourcePage={(pg) => {
               onPageChange(pg);
@@ -435,7 +722,10 @@ function DocumentWorkspace({
           <StudyTools
             tool={tool}
             onTool={onTool}
-            onClose={onClosePanel}
+            onClose={() => {
+              onTool(null);
+              onChat();
+            }}
             document={document}
             isFullWidth={!showPdfViewer}
           />

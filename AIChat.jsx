@@ -1,84 +1,33 @@
-﻿import React, { useState, useEffect } from "react";
-import { ArrowUp, Paperclip, Settings, Sparkles, X, FileText, CheckCircle2 } from "lucide-react";
-import { sendChatMessageApi } from "./api";
+import React, { useState, useEffect, useRef } from "react";
+import { ArrowUp, Paperclip, Sparkles, X, FileText } from "lucide-react";
 
-function AIChat({ document, onClose, onSelectSourcePage, initialQuestion, onClearInitialQuestion, onUploadNew, isFullWidth }) {
+function AIChat({
+  document,
+  messages = [],
+  onSendMessage,
+  thinking = false,
+  onClose,
+  onSelectSourcePage,
+  onUploadNew,
+  isFullWidth
+}) {
   const [question, setQuestion] = useState("");
-  const [thinking, setThinking] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      role: "ai",
-      text: document 
-        ? `I have indexed "${document.name}". Ask me any questions, request explanations, or test your understanding. I will answer directly based on your document with exact page citations!`
-        : "Upload or attach a PDF to start asking questions."
-    }
-  ]);
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    if (initialQuestion && initialQuestion.trim()) {
-      ask(initialQuestion.trim());
-      if (onClearInitialQuestion) onClearInitialQuestion();
-    }
-  }, [initialQuestion]);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, thinking]);
 
-  async function ask(text = question) {
-    const value = text.trim();
+  function handleSubmit(e) {
+    if (e) e.preventDefault();
+    const value = question.trim();
     if (!value || thinking) return;
-
-    setMessages((current) => [...current, { role: "user", text: value }]);
     setQuestion("");
-    setThinking(true);
-
-    try {
-      if (document?.id && typeof document.id === "number") {
-        const response = await sendChatMessageApi(document.id, value);
-        setMessages((current) => [
-          ...current,
-          {
-            role: "ai",
-            text: response.text,
-            source: response.source
-          }
-        ]);
-      } else {
-        setTimeout(() => {
-          setMessages((current) => [
-            ...current,
-            {
-              role: "ai",
-              text: "Please attach a real PDF document first to get precise, cited answers.",
-              source: 1
-            }
-          ]);
-          setThinking(false);
-        }, 500);
-      }
-    } catch (err) {
-      setMessages((current) => [
-        ...current,
-        {
-          role: "ai",
-          text: `Error: ${err.message}. Make sure your backend is running on port 8000 and your GEMINI_API_KEY is configured.`
-        }
-      ]);
-    } finally {
-      setThinking(false);
-    }
+    onSendMessage(value);
   }
 
   return (
-    <aside 
-      className="right-panel chat-panel" 
-      style={{
-        border: "1px solid var(--border)",
-        borderRadius: "14px",
-        minHeight: "650px",
-        width: "100%",
-        display: "flex",
-        flexDirection: "column",
-        background: "#0d0c12"
-      }}
-    >
+    <aside className="right-panel chat-panel" style={{ width: "100%", display: "flex", flexDirection: "column" }}>
       <div className="right-panel-head">
         <div>
           <span className="small-label">DOCMIND AI CHAT</span>
@@ -86,47 +35,53 @@ function AIChat({ document, onClose, onSelectSourcePage, initialQuestion, onClea
         </div>
 
         {onClose && (
-          <button className="close-panel" onClick={onClose}><X size={16} /></button>
+          <button className="close-panel" onClick={onClose} title="Close Chat Panel">
+            <X size={16} />
+          </button>
         )}
       </div>
 
-      {/* ACTIVE DOCUMENT HEADER IN CHAT */}
-      <div className="chat-document" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderBottom: "1px solid var(--border)" }}>
+      {/* Active Document Context Header */}
+      <div className="chat-document">
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <span className="file-badge">PDF</span>
           <div>
-            <strong style={{ display: "block", maxWidth: isFullWidth ? "600px" : "190px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <strong
+              style={{
+                display: "block",
+                maxWidth: isFullWidth ? "600px" : "220px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap"
+              }}
+            >
               {document?.name || "No document loaded"}
             </strong>
-            <small style={{ color: "#38d39f" }}>● Active Document Context</small>
+            <small style={{ color: "var(--green)" }}>● Active Document Context</small>
           </div>
         </div>
 
         {onUploadNew && (
-          <button 
-            type="button" 
-            onClick={onUploadNew}
-            style={{ background: "#211b2c", border: "1px solid #362947", borderRadius: "6px", color: "#c48aff", padding: "5px 10px", fontSize: "11px", cursor: "pointer" }}
-          >
+          <button type="button" className="switch-pdf-btn" onClick={onUploadNew}>
             Switch PDF
           </button>
         )}
       </div>
 
+      {/* Messages Feed */}
       <div className="messages" style={{ flex: 1, minHeight: "450px", overflowY: "auto", padding: "20px" }}>
         {messages.map((message, index) => (
-          <div className={`message ${message.role}`} key={index} style={{ marginBottom: "22px" }}>
-            <span className="message-who" style={{ fontSize: "10px" }}>
+          <div className={`message ${message.role}`} key={index}>
+            <span className="message-who">
               {message.role === "ai" ? "DOCMIND AI" : "YOU"}
             </span>
-            <p style={{ whiteSpace: "pre-wrap", fontSize: "12px", lineHeight: "1.7" }}>{message.text}</p>
+            <p style={{ whiteSpace: "pre-wrap" }}>{message.text}</p>
 
             {message.source && (
-              <button 
-                className="source" 
+              <button
+                className="source"
                 onClick={() => onSelectSourcePage && onSelectSourcePage(message.source)}
                 title={`Open PDF and jump to Page ${message.source}`}
-                style={{ fontSize: "10px", padding: "6px 0", cursor: "pointer" }}
               >
                 CITED SOURCE · PAGE {message.source} (Click to inspect) →
               </button>
@@ -135,73 +90,67 @@ function AIChat({ document, onClose, onSelectSourcePage, initialQuestion, onClea
         ))}
 
         {messages.length === 1 && (
-          <div className="suggestions" style={{ marginTop: "24px" }}>
+          <div className="suggestions">
             <span className="small-label">SUGGESTED QUESTIONS</span>
             {[
               "Tell me what this document is about.",
               "Summarize the key topics and definitions.",
               "What are the most important points for exams?"
             ].map((item) => (
-              <button key={item} onClick={() => ask(item)} style={{ cursor: "pointer" }}>{item}</button>
+              <button key={item} onClick={() => onSendMessage(item)}>
+                {item}
+              </button>
             ))}
           </div>
         )}
 
         {thinking && (
-          <div className="thinking" style={{ fontSize: "12px", padding: "10px 0" }}>
-            <Sparkles size={16} />
-            DocMind AI is analyzing document pages with Gemini...
+          <div className="thinking">
+            <Sparkles size={14} className="spin-icon" />
+            <span>Working...</span>
           </div>
         )}
+
+        <div ref={messagesEndRef} />
       </div>
 
-      {/* CHAT INPUT FORM */}
-      <form
-        className="chat-box"
-        onSubmit={(event) => {
-          event.preventDefault();
-          ask();
-        }}
-        style={{ margin: "14px", border: "1px solid #7937dc" }}
-      >
+      {/* Chat Input Bar */}
+      <form className="chat-box" onSubmit={handleSubmit}>
         {document && (
-          <div style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            margin: "10px 14px 0",
-            background: "#1e1828",
-            border: "1px solid #573381",
-            padding: "4px 10px",
-            borderRadius: "14px",
-            fontSize: "11px",
-            color: "#dcd4e7"
-          }}>
-            <FileText size={13} color="#a85cff" />
-            <span style={{ maxWidth: isFullWidth ? "500px" : "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div className="attached-chip">
+            <FileText size={13} color="var(--purple)" />
+            <span
+              style={{
+                maxWidth: isFullWidth ? "500px" : "200px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap"
+              }}
+            >
               {document.name}
             </span>
           </div>
         )}
 
-        <div className="chat-box-top" style={{ padding: "12px 14px" }}>
-          <Sparkles size={19} />
+        <div className="chat-box-top">
+          <Sparkles size={18} />
           <input
             value={question}
-            onChange={(event) => setQuestion(event.target.value)}
+            onChange={(e) => setQuestion(e.target.value)}
             placeholder={document ? `Ask anything about "${document.name}"...` : "Type a question..."}
-            style={{ fontSize: "13px" }}
           />
         </div>
 
-        <div className="chat-box-bottom" style={{ padding: "6px 14px 10px" }}>
-          <div>
+        <div className="chat-box-bottom">
+          <div className="chat-box-bottom-left">
             {onUploadNew && (
               <button type="button" onClick={onUploadNew} title="Attach or change PDF">
                 <Paperclip size={14} /> Attach PDF
               </button>
             )}
-            <span className="online"><i /> Gemini 3.6 Online</span>
+            <span className="online-badge">
+              <i /> Ready
+            </span>
           </div>
 
           <button className="chat-send" type="submit" disabled={thinking || !question.trim()}>

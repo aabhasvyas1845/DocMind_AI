@@ -1,88 +1,94 @@
 import React from "react";
 import {
   BookOpen,
-  FileText,
-  GraduationCap,
-  Library,
-  MessageCircle,
+  MessageSquare,
   Plus,
-  Sparkles
+  Settings,
+  Trash2
 } from "lucide-react";
 
 function Sidebar({
-  documents,
-  activeDocument,
-  view,
+  chats = [],
+  activeChatId,
   onNewChat,
-  onOpenDocument,
-  onOpenTool
+  onSelectChat,
+  onDeleteChat,
+  onOpenSettings
 }) {
   return (
     <aside className="sidebar">
+      {/* Brand Header */}
       <div className="sidebar-brand">
         <div className="sidebar-logo">
-          <BookOpen size={25} />
+          <BookOpen size={22} />
         </div>
         <strong>DocMind AI</strong>
       </div>
 
+      {/* New Conversation Button */}
       <button className="new-chat" onClick={onNewChat}>
-        <Plus size={19} />
-        New Chat
+        <Plus size={18} />
+        <span>New Chat</span>
       </button>
 
-      <div className="sidebar-group">
-        <span className="sidebar-heading">FEATURES</span>
+      {/* Conversations / Recent Chats (Antigravity-style list) */}
+      <div className="sidebar-group recent-chats-group">
+        <div className="sidebar-group-header">
+          <span className="sidebar-heading">CONVERSATIONS</span>
+          {chats.length > 0 && <span className="chat-count">{chats.length}</span>}
+        </div>
 
-        <button className={view === "document" ? "side-link active" : "side-link"} onClick={onNewChat}>
-          <MessageCircle size={15} />
-          Chat
-        </button>
+        <div className="recent-chats-list">
+          {chats.length === 0 ? (
+            <div className="empty-chats-hint">
+              <MessageSquare size={16} />
+              <p>No conversations yet.<br />Ask a question to start chatting!</p>
+            </div>
+          ) : (
+            chats.map((chat) => (
+              <div
+                key={chat.id}
+                className={`chat-item-wrapper ${activeChatId === chat.id ? "active" : ""}`}
+                onClick={() => onSelectChat(chat)}
+              >
+                <div className="chat-item-content">
+                  <div className="chat-item-header">
+                    <span className="chat-title" title={chat.title}>
+                      {chat.title}
+                    </span>
+                    <span className="chat-time">{chat.time || "Recent"}</span>
+                  </div>
+                  {chat.preview && (
+                    <p className="chat-preview" title={chat.preview}>
+                      {chat.preview}
+                    </p>
+                  )}
+                </div>
 
-        <button className="side-link" onClick={() => onOpenTool("summary")}>
-          <FileText size={15} />
-          Summaries
-        </button>
-
-        <button className="side-link" onClick={() => onOpenTool("exam")}>
-          <GraduationCap size={15} />
-          Exam Mode
-        </button>
-
-        <button className="side-link" onClick={() => onOpenTool("flashcards")}>
-          <BookOpen size={15} />
-          Flashcards
-        </button>
-
-        <button className="side-link" onClick={() => onOpenTool("library")}>
-          <Library size={15} />
-          Library
-        </button>
+                {onDeleteChat && (
+                  <button
+                    className="chat-delete-btn"
+                    title="Delete conversation"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteChat(chat.id);
+                    }}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
-      <div className="sidebar-group recent-docs">
-        <span className="sidebar-heading">RECENT DOCUMENTS</span>
-
-        {documents.map((document) => (
-          <button
-            className={`side-document ${activeDocument?.id === document.id ? "selected" : ""}`}
-            key={document.id}
-            onClick={() => onOpenDocument(document)}
-          >
-            <FileText size={14} />
-            <span>
-              <strong>{document.name}</strong>
-              <small>{document.meta}</small>
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <div className="upgrade-card">
-        <Sparkles size={21} />
-        <h3>Upgrade to Pro</h3>
-        <p>Get unlimited documents, advanced AI models and more study tools.</p>
-        <button>Upgrade</button>
+      {/* Bottom Footer with Settings */}
+      <div className="sidebar-footer">
+        <button className="sidebar-footer-btn" onClick={onOpenSettings}>
+          <Settings size={15} />
+          <span>Settings</span>
+        </button>
       </div>
     </aside>
   );
