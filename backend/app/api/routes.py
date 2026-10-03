@@ -1,4 +1,4 @@
-﻿import shutil
+import shutil
 import time
 import json
 from pathlib import Path
@@ -75,17 +75,6 @@ async def upload_pdf(file: UploadFile = File(...)):
     )
     
     chunks = chunk_pages_data(pages_data)
-    
-    client = get_client()
-    if client:
-        for c in chunks:
-            try:
-                emb = get_embedding(client, c["chunk_text"])
-                if emb:
-                    c["embedding"] = json.dumps(emb)
-            except Exception:
-                pass
-
     insert_chunks(doc_id, chunks)
     
     return {
