@@ -24,8 +24,8 @@ function Navbar({ onSettings, onTheme, currentTheme = "dark" }) {
         </button>
 
         <div className="profile">
-          <span>A</span>
-          <strong>Aabhas</strong>
+          <span>T</span>
+          <strong>Team 58</strong>
         </div>
       </div>
     </header>
