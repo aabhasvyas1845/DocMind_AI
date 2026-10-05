@@ -1,4 +1,5 @@
-﻿import sqlite3
+import sqlite3
+from pathlib import Path
 from typing import List, Optional, Dict, Any
 from app.config import DB_PATH
 
@@ -66,9 +67,22 @@ def get_all_documents() -> List[Dict[str, Any]]:
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM documents ORDER BY id DESC")
     rows = cursor.fetchall()
-    docs = [dict(row) for row in rows]
+    valid_docs = []
+    
+    for row in rows:
+        d = dict(row)
+        file_path = d.get("file_path")
+        # If the file was deleted from disk, automatically clean it out of the database
+        if file_path and Path(file_path).exists():
+            valid_docs.append(d)
+        else:
+            cursor.execute("DELETE FROM document_chunks WHERE document_id = ?", (d["id"],))
+            cursor.execute("DELETE FROM chat_messages WHERE document_id = ?", (d["id"],))
+            cursor.execute("DELETE FROM documents WHERE id = ?", (d["id"],))
+            
+    conn.commit()
     conn.close()
-    return docs
+    return valid_docs
 
 def get_document_by_id(doc_id: int) -> Optional[Dict[str, Any]]:
     conn = get_db()

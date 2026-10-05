@@ -1,4 +1,4 @@
-﻿import json
+import json
 import re
 from typing import List, Dict, Any, Optional
 import numpy as np
@@ -33,38 +33,44 @@ def get_embedding(client: genai.Client, text: str) -> List[float]:
     except Exception:
         return []
 
-def retrieve_relevant_chunks(chunks: List[Dict[str, Any]], query: str, top_k: int = 4) -> List[Dict[str, Any]]:
+def retrieve_relevant_chunks(chunks: List[Dict[str, Any]], query: str, top_k: int = 7) -> List[Dict[str, Any]]:
     """
-    Fast retrieval: searches chunks using high-priority query keywords first,
-    giving instant sub-second response times even for 1500+ page books.
+    Intelligent high-speed retrieval:
+    1. Scores chunks with keyword & phrase weighting.
+    2. Retrieves top 7 relevant chunks to provide deep academic context to the LLM.
     """
     if not chunks:
         return []
 
     words = [w.lower() for w in re.findall(r'\b[a-zA-Z0-9_]{3,}\b', query)]
-    # Common English stop words to ignore
-    stop_words = {"the", "and", "for", "with", "what", "how", "tell", "explain", "about", "this", "that", "from"}
+    stop_words = {"the", "and", "for", "with", "what", "how", "tell", "explain", "about", "this", "that", "from", "when", "does"}
     keywords = [w for w in words if w not in stop_words]
     if not keywords:
         keywords = words
 
-    # Fast scoring pass
+    # Multi-term phrase for bonus scoring
+    phrase = " ".join(keywords)
+
     scored_chunks = []
     for chunk in chunks:
         text = chunk["chunk_text"].lower()
         score = 0
+        
+        # Exact multi-word phrase bonus
+        if len(keywords) > 1 and phrase in text:
+            score += 15
+            
         for kw in keywords:
             if kw in text:
-                score += text.count(kw) * (len(kw) ** 1.2)
+                score += text.count(kw) * (len(kw) ** 1.3)
+                
         if score > 0:
             scored_chunks.append((score, chunk))
 
-    # If matches found, sort and return top_k
     if scored_chunks:
         scored_chunks.sort(key=lambda x: x[0], reverse=True)
         return [item[1] for item in scored_chunks[:top_k]]
 
-    # Fallback to middle or start of document
     return chunks[:top_k]
 
 def answer_question(document_name: str, query: str, context_chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -79,19 +85,25 @@ def answer_question(document_name: str, query: str, context_chunks: List[Dict[st
     for c in context_chunks:
         context_str += f"\n--- [Page {c['page_number']}] ---\n{c['chunk_text']}\n"
 
-    prompt = f"""You are DocMind AI, a helpful, precise academic assistant.
-The student is studying the document "{document_name}" and asked:
+    prompt = f"""You are DocMind AI, a world-class university professor and academic mentor.
+A student studying "{document_name}" asked:
 "{query}"
 
 Here are relevant excerpts from the document with page numbers:
 {context_str}
 
-Instructions:
-1. Provide a comprehensive, clear, and easy-to-understand explanation for the student.
-2. If relevant, include formulas, definitions, and applications mentioned in the document.
-3. End with a line in this exact format:
+Please provide an exceptionally smart, structured, and pedagogical answer following these standards:
+1. INTUITION & CORE CONCEPT: Begin with a clear, conceptual explanation of what the topic means and why it matters in practical/geometric terms.
+2. RIGOROUS FORMULAS & DEFINITIONS: Present the exact mathematical definitions and equations from the document using standard LaTeX:
+   - Use $...$ for inline variables and equations (e.g. $x \\in \\mathbb{{R}}^n$, $\\|x\\|$).
+   - Use $$...$$ on their own separate lines for main equations, matrices, or fractions (e.g. $$\\frac{{x}}{{\\|x\\|}}$$).
+   - Explicitly define what each variable and operator represents.
+3. KEY PROPERTIES & AXIOMS: List the essential rules, properties, or theorems mentioned in the text using clean bullet points.
+4. CITATIONS: Throughout your answer, cite the specific page from the excerpts (e.g. [Page X]) whenever stating a definition or formula.
+5. FORMATTING: Use structured Markdown with clear headers (###), bold terminology, and bullet points. Avoid dense unbroken paragraphs.
+6. End your response with this exact single line:
 [PAGE: <page_number>]
-Where <page_number> is the single most relevant page from the excerpts above.
+Where <page_number> is the single most important page for this topic.
 """
 
     try:
