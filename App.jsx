@@ -626,12 +626,6 @@ function DocumentWorkspace({
           >
             <GraduationCap size={14} /> Exam
           </button>
-          <button 
-            className={`tool-pill ${tool === "flashcards" ? "active" : ""}`} 
-            onClick={() => onTool(tool === "flashcards" ? null : "flashcards")}
-          >
-            <BookOpen size={14} /> Cards
-          </button>
 
           <button 
             className="change-doc" 
@@ -704,7 +698,6 @@ function DocumentWorkspace({
             <button onClick={onChat}><MessageCircle size={15} /> Ask Questions</button>
             <button onClick={() => onTool("summary")}><FileText size={15} /> Summary</button>
             <button onClick={() => onTool("exam")}><GraduationCap size={15} /> Exam Mode</button>
-            <button onClick={() => onTool("flashcards")}><BookOpen size={15} /> Flashcards</button>
           </div>
         </div>
       )}

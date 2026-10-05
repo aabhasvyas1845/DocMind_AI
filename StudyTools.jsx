@@ -1,17 +1,14 @@
-﻿import React, { useState, useEffect } from "react";
-import { BookOpen, FileText, GraduationCap, X, Sparkles, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
-import { fetchSummaryApi, fetchExamQuestionsApi, fetchFlashcardsApi } from "./api";
+import React, { useState, useEffect } from "react";
+import { FileText, GraduationCap, X, Sparkles, CheckCircle2 } from "lucide-react";
+import { fetchSummaryApi, fetchExamQuestionsApi } from "./api";
 
 function StudyTools({ tool, onTool, onClose, document, isFullWidth }) {
-  const [flipped, setFlipped] = useState(false);
-  const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   // Data states
   const [summaryData, setSummaryData] = useState(null);
   const [examData, setExamData] = useState(null);
-  const [flashcardsData, setFlashcardsData] = useState(null);
   
   // Quiz state for exam mode
   const [selectedAnswers, setSelectedAnswers] = useState({});
@@ -24,8 +21,6 @@ function StudyTools({ tool, onTool, onClose, document, isFullWidth }) {
       loadSummary();
     } else if (tool === "exam" && !examData) {
       loadExam();
-    } else if (tool === "flashcards" && !flashcardsData) {
-      loadFlashcards();
     }
   }, [tool, document?.id]);
 
@@ -59,30 +54,6 @@ function StudyTools({ tool, onTool, onClose, document, isFullWidth }) {
     }
   }
 
-  async function loadFlashcards() {
-    if (!document?.id) return;
-    setLoading(true);
-    setError(null);
-    setCurrentCardIndex(0);
-    setFlipped(false);
-    try {
-      const data = await fetchFlashcardsApi(document.id);
-      setFlashcardsData(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const cards = flashcardsData?.cards || [
-    {
-      question: "Sample Question",
-      answer: "Sample Answer from your document."
-    }
-  ];
-  const activeCard = cards[currentCardIndex] || cards[0];
-
   return (
     <aside 
       className="right-panel study-panel"
@@ -113,9 +84,6 @@ function StudyTools({ tool, onTool, onClose, document, isFullWidth }) {
         </button>
         <button className={tool === "exam" ? "active" : ""} onClick={() => onTool("exam")}>
           <GraduationCap size={14} /> Exam Mode
-        </button>
-        <button className={tool === "flashcards" ? "active" : ""} onClick={() => onTool("flashcards")}>
-          <BookOpen size={14} /> Flashcards
         </button>
       </div>
 
@@ -250,65 +218,6 @@ function StudyTools({ tool, onTool, onClose, document, isFullWidth }) {
                 GENERATE QUESTIONS →
               </button>
             )}
-          </>
-        )}
-
-        {/* FLASHCARDS TOOL */}
-        {tool === "flashcards" && (
-          <>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="small-label">03 / FLASHCARDS</span>
-              <button 
-                onClick={loadFlashcards} 
-                disabled={loading}
-                style={{ background: "transparent", border: "1px solid #332d3f", borderRadius: "6px", fontSize: "11px", padding: "5px 10px", color: "#a85cff", cursor: "pointer" }}
-              >
-                Regenerate Deck
-              </button>
-            </div>
-
-            <h3 style={{ fontSize: "20px", marginTop: "12px" }}>Quick Revision</h3>
-            <p style={{ fontSize: "12px" }}>Click the card to flip between question and answer.</p>
-
-            <button 
-              className="flashcard" 
-              onClick={() => setFlipped(!flipped)}
-              style={{ cursor: "pointer" }}
-            >
-              <span>{flipped ? "ANSWER" : "QUESTION"}</span>
-              <strong>
-                {flipped ? activeCard.answer : activeCard.question}
-              </strong>
-              <small>CLICK TO FLIP {activeCard.source_page ? `· REF PG ${activeCard.source_page}` : ""}</small>
-            </button>
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "18px" }}>
-              <button
-                onClick={() => {
-                  setFlipped(false);
-                  setCurrentCardIndex(c => Math.max(0, c - 1));
-                }}
-                disabled={currentCardIndex === 0}
-                style={{ background: "#181421", border: "1px solid #2d2638", color: "#ccc", borderRadius: "6px", padding: "8px 14px", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", cursor: "pointer" }}
-              >
-                <ChevronLeft size={14} /> Previous
-              </button>
-
-              <span style={{ fontSize: "11px", color: "#8a8195" }}>
-                Card {currentCardIndex + 1} of {cards.length}
-              </span>
-
-              <button
-                onClick={() => {
-                  setFlipped(false);
-                  setCurrentCardIndex(c => Math.min(cards.length - 1, c + 1));
-                }}
-                disabled={currentCardIndex === cards.length - 1}
-                style={{ background: "#181421", border: "1px solid #2d2638", color: "#ccc", borderRadius: "6px", padding: "8px 14px", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", cursor: "pointer" }}
-              >
-                Next <ChevronRight size={14} />
-              </button>
-            </div>
           </>
         )}
       </div>
