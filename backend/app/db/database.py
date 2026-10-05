@@ -89,6 +89,9 @@ def get_document_by_id(doc_id: int) -> Optional[Dict[str, Any]]:
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM documents WHERE id = ?", (doc_id,))
     row = cursor.fetchone()
+    if not row:
+        cursor.execute("SELECT * FROM documents ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
 

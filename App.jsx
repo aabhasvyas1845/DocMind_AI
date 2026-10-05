@@ -92,9 +92,11 @@ function App() {
         const backendDocs = await fetchDocumentsApi();
         if (backendDocs && backendDocs.length > 0) {
           setDocuments(backendDocs);
-          if (!activeDocument) {
-            setActiveDocument(backendDocs[0]);
-          }
+          setActiveDocument((curr) => {
+            if (!curr) return backendDocs[0];
+            const exists = backendDocs.find((d) => d.id === curr.id);
+            return exists || backendDocs[0];
+          });
         }
       } catch (err) {
         console.log("Documents init:", err.message);

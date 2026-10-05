@@ -125,14 +125,15 @@ async def chat_with_doc(req: ChatRequest):
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
         
-    chunks = get_chunks_for_document(req.document_id)
-    chat_history = get_chat_history(req.document_id)
+    actual_id = doc["id"]
+    chunks = get_chunks_for_document(actual_id)
+    chat_history = get_chat_history(actual_id)
     relevant_chunks = retrieve_relevant_chunks(chunks, req.question, top_k=8, chat_history=chat_history)
     
     ai_result = answer_question(doc["name"], req.question, relevant_chunks, chat_history=chat_history)
     
-    save_chat_message(req.document_id, "user", req.question)
-    save_chat_message(req.document_id, "ai", ai_result["answer"], ai_result.get("source_page"))
+    save_chat_message(actual_id, "user", req.question)
+    save_chat_message(actual_id, "ai", ai_result["answer"], ai_result.get("source_page"))
     
     return {
         "role": "ai",
