@@ -68,6 +68,7 @@ def get_all_documents() -> List[Dict[str, Any]]:
     cursor.execute("SELECT * FROM documents ORDER BY id DESC")
     rows = cursor.fetchall()
     valid_docs = []
+    purged = False
     
     for row in rows:
         d = dict(row)
@@ -79,8 +80,11 @@ def get_all_documents() -> List[Dict[str, Any]]:
             cursor.execute("DELETE FROM document_chunks WHERE document_id = ?", (d["id"],))
             cursor.execute("DELETE FROM chat_messages WHERE document_id = ?", (d["id"],))
             cursor.execute("DELETE FROM documents WHERE id = ?", (d["id"],))
+            purged = True
             
     conn.commit()
+    if purged:
+        conn.execute("VACUUM")
     conn.close()
     return valid_docs
 
