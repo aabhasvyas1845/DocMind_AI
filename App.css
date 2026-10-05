@@ -2074,3 +2074,216 @@ html[data-theme="light"] {
   from { opacity: 0; transform: scale(0.98); }
   to { opacity: 1; transform: scale(1); }
 }
+
+/* ==========================================================================
+   MATHEMATICAL TYPESETTING (KATEX) & MARKDOWN STYLING
+   ========================================================================== */
+
+.formatted-math-content {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.formatted-math-content h2,
+.formatted-math-content h3,
+.formatted-math-content h4 {
+  margin: 14px 0 6px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.formatted-math-content h2 { font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.formatted-math-content h3 { font-size: 14.5px; color: var(--purple); }
+.formatted-math-content h4 { font-size: 13.5px; }
+
+.formatted-math-content p.markdown-paragraph {
+  margin: 6px 0;
+  line-height: 1.7;
+}
+
+.formatted-math-content li.markdown-bullet {
+  margin: 5px 0 5px 18px;
+  list-style-type: disc;
+  line-height: 1.6;
+}
+
+.formatted-math-content .markdown-spacing {
+  height: 8px;
+}
+
+.formatted-math-content strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.katex-display-wrapper {
+  margin: 10px 0;
+  padding: 10px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.katex-inline-wrapper {
+  padding: 0 2px;
+}
+
+.citation-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--purple);
+  background: var(--purple-soft);
+  padding: 1px 7px;
+  border-radius: 6px;
+  margin-left: 4px;
+  vertical-align: baseline;
+}
+
+/* ==========================================================================
+   COMPREHENSIVE LIGHT THEME OVERRIDES (FIX ALL DARK ELEMENTS)
+   ========================================================================== */
+
+/* User Message bubble in Light Mode */
+[data-theme="light"] .message.user {
+  background: #f3e8ff !important;
+  border: 1px solid #d8b4fe !important;
+  color: #3b0764 !important;
+}
+
+[data-theme="light"] .message.user p {
+  background: transparent !important;
+  color: #3b0764 !important;
+  font-weight: 500;
+}
+
+[data-theme="light"] .message.user .message-who {
+  color: #7c3aed !important;
+}
+
+/* AI Message bubble in Light Mode */
+[data-theme="light"] .message.ai {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+[data-theme="light"] .message.ai .message-who {
+  color: #6d28d9;
+}
+
+[data-theme="light"] .formatted-math-content {
+  color: #0f172a;
+}
+
+[data-theme="light"] .formatted-math-content strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .katex-display-wrapper {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Header Action Buttons in Document Workspace (Split PDF & Switch PDF) */
+[data-theme="light"] .change-doc {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #1e293b !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .change-doc:hover {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Tool Pills in Workspace Header (Summary, Exam, Cards) */
+[data-theme="light"] .tool-pill {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+[data-theme="light"] .tool-pill:hover,
+[data-theme="light"] .tool-pill.active {
+  background: rgba(124, 58, 237, 0.08) !important;
+  border-color: #7c3aed !important;
+  color: #7c3aed !important;
+}
+
+/* Close panel button (X) on Chat Panel */
+[data-theme="light"] .close-panel {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+[data-theme="light"] .close-panel:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Switch PDF button inside Chat panel */
+[data-theme="light"] .switch-pdf-btn {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #6d28d9 !important;
+}
+
+[data-theme="light"] .switch-pdf-btn:hover {
+  background: #f5f3ff !important;
+}
+
+/* Chat Input Bar in Light Mode */
+[data-theme="light"] .chat-box {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .chat-box-top input {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .chat-box-top input::placeholder {
+  color: #94a3b8 !important;
+}
+
+[data-theme="light"] .chat-box-bottom {
+  border-top-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] .chat-box-bottom button {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .chat-send {
+  background: #7c3aed !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .attached-chip {
+  background: #f5f3ff !important;
+  border-color: #ddd6fe !important;
+  color: #5b21b6 !important;
+}
+
+/* Cited Source Button */
+[data-theme="light"] .source {
+  background: #f5f3ff !important;
+  border-color: #ddd6fe !important;
+  color: #6d28d9 !important;
+}
+
+[data-theme="light"] .source:hover {
+  background: #ede9fe !important;
+}

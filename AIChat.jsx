@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ArrowUp, Paperclip, Sparkles, X, FileText } from "lucide-react";
+import FormattedMessage from "./FormattedMessage";
 
 function AIChat({
   document,
@@ -75,7 +76,11 @@ function AIChat({
             <span className="message-who">
               {message.role === "ai" ? "DOCMIND AI" : "YOU"}
             </span>
-            <p style={{ whiteSpace: "pre-wrap" }}>{message.text}</p>
+            {message.role === "ai" ? (
+              <FormattedMessage text={message.text} />
+            ) : (
+              <p style={{ whiteSpace: "pre-wrap" }}>{message.text}</p>
+            )}
 
             {message.source && (
               <button

@@ -92,7 +92,6 @@ function App() {
         const backendDocs = await fetchDocumentsApi();
         if (backendDocs && backendDocs.length > 0) {
           setDocuments(backendDocs);
-          // If no active doc and user hasn't chosen one, set the first one as default
           if (!activeDocument) {
             setActiveDocument(backendDocs[0]);
           }
@@ -132,7 +131,6 @@ function App() {
     });
     setUploading(true);
 
-    // Simulate progressive status updates for user feedback
     const stepTimer1 = setTimeout(() => {
       setUploadInfo((curr) => curr ? {
         ...curr,
@@ -154,7 +152,6 @@ function App() {
       clearTimeout(stepTimer1);
       clearTimeout(stepTimer2);
 
-      // Finish progress
       setUploadInfo((curr) => curr ? {
         ...curr,
         step: 4,
@@ -243,7 +240,6 @@ function App() {
     setActiveDocument(doc);
     setActivePage(1);
     
-    // Check if an existing chat exists for this document
     const existing = chats.find((c) => c.documentId === doc.id || c.document?.id === doc.id);
     if (existing) {
       handleSelectChat(existing);
@@ -272,7 +268,6 @@ function App() {
       return;
     }
 
-    // Switch view to document workspace immediately
     if (view !== "document") {
       setView("document");
       setChatOpen(true);
@@ -306,7 +301,6 @@ function App() {
       const finalMessages = [...updatedMessages, aiMsg];
       setChatMessages(finalMessages);
 
-      // Save or update in recent chats list (Antigravity-style)
       const currentChatId = activeChatId || `chat_${Date.now()}`;
       setActiveChatId(currentChatId);
 
@@ -545,8 +539,6 @@ function Home({
           exam questions, and flashcards.
         </p>
 
-        {/* Note: The 4 buttons were removed as requested! */}
-
         <form className="home-prompt" onSubmit={onSubmitQuestion}>
           {activeDocument && (
             <div className="attached-document-badge">
@@ -592,34 +584,6 @@ function Home({
           </div>
         </form>
       </section>
-
-      {/* Uploaded Documents List */}
-      {documents.length > 0 && (
-        <section className="recent-section" style={{ marginTop: "36px" }}>
-          <div className="section-title">
-            <h2>Your Uploaded Documents ({documents.length})</h2>
-          </div>
-
-          <div className="recent-grid">
-            {documents.slice(0, 3).map((doc) => (
-              <button
-                className={`recent-card ${activeDocument?.id === doc.id ? "active-doc-card" : ""}`}
-                key={doc.id}
-                onClick={() => onOpenDocument(doc)}
-              >
-                <div className="recent-icon"><FileText size={16} /></div>
-                <div className="recent-copy">
-                  <strong>{doc.name}</strong>
-                  <span>{doc.meta || `${doc.total_pages || 1} pages`}</span>
-                </div>
-                <MoreHorizontal size={17} />
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <Upload compact onFile={onFile} fileInput={fileInput} />
     </main>
   );
 }
@@ -650,7 +614,6 @@ function DocumentWorkspace({
         </div>
 
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          {/* Quick study tools buttons inside workspace */}
           <button 
             className={`tool-pill ${tool === "summary" ? "active" : ""}`} 
             onClick={() => onTool(tool === "summary" ? null : "summary")}
@@ -745,8 +708,6 @@ function DocumentWorkspace({
           </div>
         </div>
       )}
-
-      <Upload compact onFile={onFile} />
     </main>
   );
 }
