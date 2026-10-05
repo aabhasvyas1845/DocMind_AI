@@ -71,7 +71,6 @@ def route_query_to_target_pages(client: Optional[genai.Client], query: str, chun
     match_pq = re.search(r'\b(?:practice\s+question|pq)\s*(\d+)\b', q_lower)
     if match_pq:
         pq_num = match_pq.group(1)
-        # Scan outline to locate this specific Practice Question
         for c in chunks:
             if f"practice question {pq_num}" in c["chunk_text"].lower():
                 return {
@@ -117,17 +116,26 @@ Respond in valid JSON only:
         "is_exercise": any(w in q_lower for w in ["solve", "sql", "query", "queries", "code", "answer"])
     }
 
-def retrieve_relevant_chunks(chunks: List[Dict[str, Any]], query: str, top_k: int = 8) -> List[Dict[str, Any]]:
+def retrieve_relevant_chunks(chunks: List[Dict[str, Any]], query: str, top_k: int = 8, chat_history: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
     """
     Two-Stage Hybrid Retrieval:
     Stage 1: Intent & Page Navigator routes query to specific pages.
     Stage 2: Fallback keyword & phrase scoring if routing is broad.
+    Includes conversational context resolution for follow-up questions.
     """
     if not chunks:
         return []
 
     client = get_client()
-    routing = route_query_to_target_pages(client, query, chunks)
+
+    # If follow-up query references prior turn (e.g. "solve them", "solve above")
+    q_eval = query
+    if chat_history and len(query.split()) <= 5:
+        last_turn = chat_history[-1].get("text", "") if chat_history else ""
+        if any(ref in query.lower() for ref in ["them", "these", "those", "above", "first one", "second", "third", "solve", "why"]):
+            q_eval = f"{last_turn[:250]} {query}"
+
+    routing = route_query_to_target_pages(client, q_eval, chunks)
     target_pages = routing.get("target_pages", [])
 
     if target_pages:
@@ -161,10 +169,11 @@ def retrieve_relevant_chunks(chunks: List[Dict[str, Any]], query: str, top_k: in
 
     return chunks[:top_k]
 
-def answer_question(document_name: str, query: str, context_chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
+def answer_question(document_name: str, query: str, context_chunks: List[Dict[str, Any]], chat_history: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """
     LAYER 2: The Professor (Deep Academic Solver)
-    Renders step-by-step solutions with exact SQL/code and KaTeX LaTeX mathematics.
+    Renders step-by-step solutions with exact SQL/code, KaTeX LaTeX mathematics,
+    and multi-turn conversation memory.
     """
     client = get_client()
     if not client:
@@ -177,12 +186,23 @@ def answer_question(document_name: str, query: str, context_chunks: List[Dict[st
     for c in context_chunks:
         context_str += f"\n--- [Page {c['page_number']}] ---\n{c['chunk_text']}\n"
 
+    history_str = ""
+    if chat_history:
+        recent = chat_history[-6:]
+        conv_lines = []
+        for msg in recent:
+            role_label = "Student" if msg.get("role") == "user" else "DocMind AI"
+            snippet = msg.get("text", "")[:450].strip()
+            conv_lines.append(f"{role_label}: {snippet}")
+        if conv_lines:
+            history_str = "Prior Conversation Context:\n" + "\n".join(conv_lines) + "\n\n"
+
     q_lower = query.lower()
     is_exercise = any(w in q_lower for w in ["solve", "query", "queries", "sql", "exercise", "solution", "calculate", "write a query", "questions"])
 
     if is_exercise:
         prompt = f"""You are DocMind AI, an elite university professor and database/computer science expert.
-A student studying "{document_name}" asked:
+{history_str}A student studying "{document_name}" asked:
 "{query}"
 
 Here are the exact relevant pages from the document:
@@ -202,7 +222,7 @@ Where <page_number> is the primary starting page of these questions.
 """
     else:
         prompt = f"""You are DocMind AI, a world-class university professor and academic mentor.
-A student studying "{document_name}" asked:
+{history_str}A student studying "{document_name}" asked:
 "{query}"
 
 Here are relevant excerpts from the document with page numbers:

@@ -108,7 +108,7 @@ async def serve_pdf(doc_id: int):
     path = Path(doc["file_path"])
     if not path.exists():
         raise HTTPException(status_code=404, detail="PDF file not found on server")
-        
+    
     headers = {
         "Content-Disposition": "inline",
         "Cache-Control": "public, max-age=86400"
@@ -126,9 +126,10 @@ async def chat_with_doc(req: ChatRequest):
         raise HTTPException(status_code=404, detail="Document not found")
         
     chunks = get_chunks_for_document(req.document_id)
-    relevant_chunks = retrieve_relevant_chunks(chunks, req.question, top_k=8)
+    chat_history = get_chat_history(req.document_id)
+    relevant_chunks = retrieve_relevant_chunks(chunks, req.question, top_k=8, chat_history=chat_history)
     
-    ai_result = answer_question(doc["name"], req.question, relevant_chunks)
+    ai_result = answer_question(doc["name"], req.question, relevant_chunks, chat_history=chat_history)
     
     save_chat_message(req.document_id, "user", req.question)
     save_chat_message(req.document_id, "ai", ai_result["answer"], ai_result.get("source_page"))
